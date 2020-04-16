@@ -101,5 +101,54 @@ def assign_strata(stations, blocks):
     
     return gpd.GeoDataFrame(strata, geometry = 'geometry')
 
+def cleaning_transactions(transactions, stations):
+    '''
+    Creates a timestamp colum with transaction datetime information 
+    Orders the table by user_id and transaction timestamp
+    Merge with a station unique Id (col = recaudoestacion)
+    
+    Input:
+    -data: row transaccion data 
+    -stations: clean stations with ids and unique "recaudoestacion"
+    
+    Output
+    -Clean and ordered transactions dataframe
+    '''
+    data = transactions.copy()
+    
+    #Creating dataetime column with dataetime format 
+    data.horatransaccion = data.horatransaccion.astype(str)
+    data.fechatransaccion = data.fechatransaccion.astype(str)
+    data['sec'] = data.horatransaccion.apply(lambda x: x[-2:])
+    data['minute'] = data.horatransaccion.apply(lambda x: x[-4:-2])
+    data['hour'] = data.horatransaccion.apply(lambda x: x[:-4])
+
+    data['hour'].replace('', '0', inplace = True)
+    data['minute'].replace('', '0', inplace = True)
+    data['year'] = data.fechatransaccion.apply(lambda x: x[:4])
+    data['month'] = data.fechatransaccion.apply(lambda x: x[4:6])
+    data['day'] = data.fechatransaccion.apply(lambda x: x[6:8])
+
+    #Converting to a stand alone dataaframe for conversion
+    df = pd.DataFrame({'year': data['year'],
+                       'month': data['month'],
+                       'day': data['day'],
+                       'hour': data['hour'],
+                       'minutes':data['minute'] ,
+                       'seconds': data['sec']})
+
+    data['datetime'] = pd.to_datetime(df)
+    
+    df = data.merge(stations, how = 'left', on='idestacion') #merging station unique ID
+    df = df[~df.recaudoestacion.isnull()] # Remove observations with invalid station ID
+    df.sort_values(['idnumerotarjeta', 'datetime'], inplace = True ) 
+    
+    cols_order = ['idnumerotarjeta', 'datetime', 'recaudoestacion', 'idtipotarjeta',
+                  'idtipotarifa','saldopreviotransaccion', 'valor', 'saldodespues_transaccion']
+    
+    return df[cols_order]
+
+
+
 
 
